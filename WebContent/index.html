@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Chat-Room</title>
+        <link rel="stylesheet" media="screen" href="css/bootstrap.css">
+        <link rel="stylesheet" media="screen" href="css/main.css">
+       <link href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAAEEfUpiAAAABGdBTUEAALGPC/xhBQAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB90BHAcVB+lFAfQAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAABW0lEQVRYw+VWsW6DMBB9tqA/kKrKZ3SIVNg69S/I1I2xG1GkdICtW5C6ZIGf6NKxIsqPRB2QunZAdKiIHNsJhoMi0rcgHXfP5zvfsxkABF5WokLgZWWFwMtKdvQXAIcEvUeYOMeGxXx7MCohikEG1xnDxDlQah2+8m8s5luzJeocYo7z8C1549XaSiHEr1IpGSKL1mF2f0OsZKNe1IGDiJPNNrH1l0EvBKvHHZ5ebpWtdNKFmELAAi9bA/DbBEepy6hbyKldmJDbaNWdNHnCjYYpTBwlUGczPkhVdqIgNiIQNUkrWuMYJgCwr3h7go+3PZavs36mEaMmiEl60AFiPuDiAOBzDIzBE7BMb2YTsRFj63T0bAK64KbEpAq0hVg5uYqnEu80AfFRblqpy5uCovjVdstmf38GAGD3/gn3YYrnzZ3RGSBfR6MXon+fQM6j1GXUN37bqzhK3esfHwCSdKwWHosAAAAASUVORK5CYII=" rel="icon" type="image/x-icon" />
+             <script type="text/javascript" src="script/jquery-1.7.1.min.js"></script>
+            <script type="text/javascript" src="script/jquery.json-2.2.min.js"></script>
+	    <script type="text/javascript" src="script/cometd.js"></script>
+	    <script type="text/javascript" src="script/jquery.cometd.js"></script>
+	    <script type="text/javascript">
+         jQuery(function($) {
+         	$('#logout').hide();
+				$('#chatContent').hide();
+            var _disconnecting = false;
+            var _connected = false;
+            var userId = "";
+            var cometd = new $.Cometd('CometD chat client');
+            cometd.configure({
+                url : document.location.protocol + '//' + document.location.host + '/cometd',
+                logLevel: 'debug'
+            });
+            
+            function disconnected() {
+            	   $.post('logout.action', {
+                      
+                    }, function(response) {
+                        if(response == 'loggedOut'){
+                           
+                        }else{
+                            window.alert('Authentication failed!');
+                        }                       
+                });
+                var contentDiv = document.getElementById("content");
+                contentDiv.style.height = "";
+                $('#chatContent').hide();
+                $('#Welcome').show();
+                $('#logout').hide();
+                $('#login').show(); 
+                $("#username").val('')               
+            }
+
+            function connected() {
+                cometd.subscribe('/chatroom', function(m) {
+                	   var msg = m.data;
+                	   var rec = msg.split(":")
+                    if(rec.length == 2){
+                    		if( rec[0] == userId){
+                    			msg = "</div><div class='message talk me'><span>"+rec[0]+"</span><p>"+rec[1]+"</p></div>";
+                    		}else{
+                    			msg = "</div><div class='message talk'><span>"+rec[0]+"</span><p>"+rec[1]+"</p></div>";
+                    		}
+                    }
+                    $('#messages').append(msg);
+                    $("#messages")[0].scrollTop = 9999999;
+                });
+                $('#Welcome').hide();                
+                var header = document.getElementById("headerText");
+                header.innerHTML = "Welcome to the chat room <small>You are chatting as "+userId+"</small>";
+                var contentDiv = document.getElementById("content");
+                contentDiv.style.height = "550px";
+                $('#chatContent').show();
+                $('#logout').show();  
+                $('#login').hide();
+                $('#talk').focus();
+            }            
+			
+            cometd.addListener('/meta/disconnect', function(message) {
+                if (message.successful) {
+                    disconnected();
+                }
+            });
+
+            cometd.addListener('/meta/connect', function(message) {
+                if (_disconnecting || cometd.isDisconnected()) {
+                    _connected = false;
+                } else {
+                    var wasConnected = _connected;
+                    _connected = message.successful;
+                    if (!wasConnected && _connected) {
+                        connected();
+                    } else if (wasConnected && !_connected) {
+                        disconnected();
+                    }
+                }
+            });
+            
+            $('#signin').click(function() {
+               login();
+            });    
+            
+            $('#disconnect').click(function() {
+                if (_connected && !_disconnecting) {
+                    _disconnecting = true;
+                    cometd.disconnect();
+                }
+            });     
+            
+            var login = function(){            	
+            	  var u = $('#username').val();
+                userId = u;
+                if(u) {
+                    $.post('login.action', {
+                        user: u
+                    }, function(response) {
+                        if(response == 'Authorized'){
+                            _disconnecting = false;
+                            cometd.handshake();
+                        }else{
+                            window.alert('Authentication failed!');
+                        }
+                       
+                    });
+                }
+            }           
+            
+            var sendMessage = function() {
+                var msg = $('#talk').val();
+                if(msg) {
+                    $.post('chat.action', {
+                        message : msg
+                    }, function(response) {
+                        if( response != 'Published'){
+                            window.alert('Oops! Something went wrong during message delivery!!!');
+                        }
+                    });
+                }
+                $("#talk").val('')
+            }
+            
+            var loginReturnKey = function(e) {
+                if(e.charCode == 13 || e.keyCode == 13) {
+                    e.preventDefault()
+                    login()
+                } 
+            }
+            
+            var handleReturnKey = function(e) {
+                if(e.charCode == 13 || e.keyCode == 13) {
+                    e.preventDefault()
+                    sendMessage()
+                } 
+            }
+            
+            $("#username").keypress(loginReturnKey);    
+            $("#talk").keypress(handleReturnKey);  
+            
+        });
+        </script>
+    </head>
+    <body>        
+        <div class="topbar">
+            <div class="fill">
+                <div class="container">
+	                    <a class="brand" href="#">Cometd Chat-Room</a>
+	                    <div id="logout">
+	                    		<p class="pull-right"><a id="disconnect">Disconnect</a></p>
+	                    </div>	                    
+	                    <div id="login">
+                       		<button id="signin" class="btn pull-right" type="submit">Sign in</button>
+                       		<input id="username" name="username" class="input-small pull-right" type="text" placeholder="Username">
+                       </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+
+            <div id="content" class="content">
+                 <div id="Welcome" class="alert-message block-message info">
+							<p>
+			    				<strong>This is the cometd Websocket sample application!</strong> 
+			    				To start, choose a username and sign in using the top right form.
+							</p>
+		    			</div>
+						<div id="chatContent">		    			
+		    				<div class="page-header">
+        						<h1 id="headerText"></h1>
+    		 				</div>
+	   	 				<div id="onChat">
+								<div id="main">
+		    						<div id="messages">
+		    						</div>		
+		    						<textarea id="talk" placeholder="Type your messages here"></textarea>    						
+								</div>								
+							</div>
+	    				</div>
+	    		</div>
+	    		<footer>
+                <p>
+                    <!-- <a href="http://harrybabu.github.com">harrybabu</a> -->
+                    <a href="http://techtenalis.blogspot.in">Tech Tenalis</a>
+                </p>
+            </footer>
+       </div>
+       
+    </body>
+</html>
+

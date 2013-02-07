@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE struts PUBLIC
+"-//Apache Software Foundation//DTD Struts Configuration 2.0//EN"
+"http://struts.apache.org/dtds/struts-2.0.dtd">
+
+<struts>
+    <constant name="struts.devMode" value="true" />
+    <constant name="struts.action.extension" value="action,xml,json"/>
+    <package name="struts2" extends="struts-default">          
+        <interceptors>
+            <interceptor name="AuthenticationInterceptor" class="com.harry.interceptor.AuthenticationInterceptor"/>
+            <interceptor-stack name="interceptStack">
+                <interceptor-ref name="AuthenticationInterceptor"/>
+                <interceptor-ref name="defaultStack"/>
+            </interceptor-stack>
+        </interceptors>
+        <action name="login" class="com.harry.cometd.web.actions.ChatAction" method="authorize">
+            <result name="success" type="stream">
+            <param name="inputName">inputStream</param>
+            </result>
+            <interceptor-ref name="interceptStack"></interceptor-ref>
+        </action>
+        <action name="chat" class="com.harry.cometd.web.actions.ChatAction" method="chat">
+            <result name="success" type="stream">
+            <param name="inputName">inputStream</param>
+            </result>
+            <interceptor-ref name="interceptStack"></interceptor-ref>
+        </action>
+        <action name="logout" class="com.harry.cometd.web.actions.ChatAction" method="logout">
+            <result name="success" type="stream">
+            <param name="inputName">inputStream</param>
+            </result>                        
+        </action>              
+    </package>
+</struts>
